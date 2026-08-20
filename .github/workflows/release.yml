@@ -1,37 +1,55 @@
-name: Release
-on:
-  workflow_run:
-    workflows: ['CI']
-    branches: [master]
-    types: [completed]
+name: Build and Publish
 
-permissions:
-  contents: read # for checkout
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-  release:
-    name: NPM Release
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  build-and-publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # to be able to publish a GitHub release
-      issues: write # to be able to comment on released issues
-      pull-requests: write # to be able to comment on released pull requests
-      id-token: write # to enable use of OIDC for trusted publishing and npm provenance
+      contents: write
+      packages: write
+
     steps:
-      # https://github.com/actions/checkout
-      - uses: actions/checkout@v6
-      # https://github.com/actions/setup-node
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v4
         with:
-          node-version: 24
-          cache: 'npm'
-      # Ensure npm 11.5.1 or later is installed
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@client-giant"
+
       - name: Update npm
         run: npm install -g npm@latest
+
       - run: npm ci
+
       - run: npm run build
-      - name: Release
-        run: cd dist/ngx-toastr && npx semantic-release@latest
+
+      - name: Configure git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Commit package-lock changes
+        run: |
+          git add package-lock.json
+          git diff --staged --quiet || git commit -m "chore: update package-lock.json [skip ci]"
+
+      - name: Increment version
+        run: |
+          cd projects/ngx-toastr
+          npm version patch -m "chore: bump version to %s [skip ci]"
+
+      - name: Push changes
+        run: git push --follow-tags
+
+      - name: Publish to GitHub Packages
+        run: cd dist/ngx-toastr && npm publish
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
