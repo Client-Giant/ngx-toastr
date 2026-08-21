@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
@@ -21,8 +20,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-          registry-url: "https://npm.pkg.github.com"
-          scope: "@client-giant"
 
       - name: Update npm
         run: npm install -g npm@latest
@@ -48,8 +45,3 @@ jobs:
 
       - name: Push changes
         run: git push --follow-tags
-
-      - name: Publish to GitHub Packages
-        run: cd dist/ngx-toastr && npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
